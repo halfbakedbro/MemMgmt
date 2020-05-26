@@ -153,6 +153,73 @@ void *_qalloc(size_t sz, int zeroset, const char *func, const char *file, unsign
     return (char*)node + sizeof(*node);
 }
 
+/*************************************************************
+ *  _QFREE : Frees the memory allocated
+ * 
+ * INPUT PARAMETERS : 
+ *                      void *ptr : Pointer to the memory
+ *                      const char *func : Name of the function from where it is called
+ *                      const char *file : Filename for where it is called
+ *                      unsigned line : Line number
+ * 
+ * OUTPUT PARAMETERS : 
+ *                      VOID
+ * **********************************************************************/
+
 void _qfree(void *ptr, const char* func, const char* file, unsigned line) {
     
+    if (ptr == NULL) return
+
+    int itHas = 0;
+
+    q_node *node = (q_node*)((char*)ptr - sizeof(*node));
+
+    qmalloc_has_node(node, itHas);
+
+    if (!itHas) {
+        fprintf(stderr, "Couldn't free : %p %s , line %u\n", ptr, file , line);
+        return;
+    }
+
+    update_qalloc_free(node);
+
+    free(node);
 }
+
+void *_realloc(void *ptr, size_t sz, const char *func, const char *file, unsigned line) {
+
+    if (ptr == NULL) return _qalloc(sz, 0 , func, file, line);
+
+    pq_node node = (q_node*)((char*)ptr - sizeof(*node));
+    pq_node old_node = node;
+
+    if (!_q_has_node(node)){
+        fprintf(stderr, "Realloc called wrong: %p %s %s, line %u\n", ptr, func, file, line);
+        return NULL;
+    }
+
+    node = realloc(node, sizeof(*node) + sz);
+
+    if (node == NULL) {
+#ifdef MGMT_HANDLE_ABRT
+        fprintf(stderr, "Couldn't realloc: %s %s, line %u\n", func, file, line);
+        _q_abrt();
+#else
+        oom_handler(sz);
+        return NULL;
+#endif
+    }
+
+    node->sz = sz;
+    node->file = file;
+    node->func = func;
+    node->line = line;
+
+    if(q_head == old_node) q_head = node;
+    if (node->prev) node->prev->next = node;
+    if (node->next) node->next->prev = node;
+
+    return (char*)node + sizeof(*node);
+}
+
+
