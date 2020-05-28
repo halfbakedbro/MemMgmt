@@ -50,6 +50,7 @@ static void (*oom_handler)(size_t size) = qmalloc_default_oom;
 int _q_has_node(pq_node arg) {
     pq_node node = q_head;
 
+    //TODO: Locking will be needed here too
     while (node != NULL) {
         if (node == arg) return 1;
         node = node->next;
@@ -186,6 +187,20 @@ void _qfree(void *ptr, const char* func, const char* file, unsigned line) {
     free(node);
 }
 
+/*************************************************************
+ *  _QREALLOC : Realocates the memory
+ * 
+ * INPUT PARAMETERS : 
+ *                      void *ptr : Pointer to the memory
+ *                      size_t sz : new size of memory
+ *                      const char *func : Name of the function from where it is called
+ *                      const char *file : Filename for where it is called
+ *                      unsigned line : Line number
+ * 
+ * OUTPUT PARAMETERS : 
+ *                      VOID
+ * **********************************************************************/
+
 void *_realloc(void *ptr, size_t sz, const char *func, const char *file, unsigned line) {
 
     if (ptr == NULL) return _qalloc(sz, 0 , func, file, line);
@@ -220,6 +235,64 @@ void *_realloc(void *ptr, size_t sz, const char *func, const char *file, unsigne
     if (node->next) node->next->prev = node;
 
     return (char*)node + sizeof(*node);
+}
+
+/**********************************************************************************
+ * QDUMP : This functions dump the data of the unfreed memory allocated.
+ *      input parameter: 
+ *                          FILE pointer
+ *      output parameter:
+ *********************************************************************************/
+
+void qdump(FILE *fp){
+
+    size_t total = 0;
+
+    if (!fp) fp = stdout;
+
+    pthread_mutex_lock(&stat_mutex);
+    pq_node node = q_head;
+
+    while (node != NULL) {
+        fprintf(fp, "Unfreed: %p %s %s, line %lu (%lu bytes)\n",
+                    (char*)node + sizeof(*node), node->func, node->file, (unsigned long)node->line,
+                    (unsigned long)node->size);
+#ifdef MGMT_STACK_TRACE
+        backtrace_symbols_fd(node->stacktrace, node->stacktrace_sz, fileno(fp));
+        fprintf(fp, "\n");
+#endif
+
+        total += node->size;
+        node = node->next;
+    }
+
+    pthread_mutex_unlock(&stat_mutex);
+
+    fprintf(fp, "Total Unfreed Memory: %lu bytes\n", (unsigned long)total);
+}
+
+size_t total_usage(void) {
+    pq_node node = q_head;
+
+    size_t total = 0;
+
+    while (node != NULL) {
+        total += node->size;
+        node = node->next;
+    }
+
+    return total;
+}
+
+size_t _qsize(void *ptr, const char *func, const char *file, unsigned line) {
+    pq_node node = (q_node*)((char*)ptr - sizeof(*node));
+
+    if (!_q_has_node(node)){
+        fprintf(fp, "Bad pointer %p %s %s, line %u\n", ptr, func, file, line);
+        _q_abrt();
+    }
+
+    return node->size;
 }
 
 

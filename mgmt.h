@@ -31,8 +31,8 @@ void _qcleanup();
 
 void *_qalloc(size_t, int, const char*, const char*, unsigned);
 void *_qrealloc(void*, size_t, const char*, const char*, unsigned);
-void *_qfree(void*, const char*, const char*, unsigned);
-void *_qsize(void*, const char*, const char*, unsigned);
+void _qfree(void*, const char*, const char*, unsigned);
+size_t _qsize(void*, const char*, const char*, unsigned);
 
 void qdump(FILE*);
 
